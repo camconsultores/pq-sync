@@ -44,7 +44,6 @@ Output appears in the **pq-sync** Output Channel. Status bar shows sync state.
 |---------|-------------|
 | `pqSync.workbookPath` | Absolute path to the Excel workbook (`.xlsx`) |
 | `pqSync.mcodePath` | Absolute path to the folder containing `.pq` files |
-| `pqSync.scriptsRoot` | Optional: path to external script overrides (advanced) |
 
 ---
 

@@ -83,10 +83,6 @@
         "pqSync.mcodePath": {
           "type": "string",
           "description": "Absolute path to the mcode folder containing .pq files"
-        },
-        "pqSync.scriptsRoot": {
-          "type": "string",
-          "description": "Optional absolute path to an external scripts directory containing extract_mcode.ts and import_mcode.ts. When unset, the extension uses its bundled self-contained script binaries."
         }
       }
     }

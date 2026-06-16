@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { readConfig, autoDetect, writeConfig, getScriptsRoot, PqSyncConfig } from '../config';
+import { readConfig, autoDetect, writeConfig, PqSyncConfig } from '../config';
 
 let _extensionPath = '';
 
@@ -40,14 +40,8 @@ export function workspaceRoot(): string {
     return vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath ?? process.cwd();
 }
 
-/** Returns the command + args prefix needed to invoke a script by its .ts basename. */
+/** Returns the command + args to invoke a bundled script by its .ts basename. */
 export function getScriptInvocation(scriptName: string): { command: string; args: string[] } {
-    const override = getScriptsRoot();
-    if (override) {
-        // Optional override for development or external scripts repository.
-        return { command: 'npx', args: ['tsx', path.join(override, 'scripts', scriptName)] };
-    }
-    // Self-contained production: run bundled JS from the extension dist outputs.
     const scriptJs = scriptName.replace(/\.ts$/, '.js');
     return { command: 'node', args: [path.join(_extensionPath, 'dist', 'scripts', scriptJs)] };
 }

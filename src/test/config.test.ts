@@ -1,7 +1,7 @@
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { readConfig, writeConfig, autoDetect, getScriptsRoot } from '../config';
+import { readConfig, writeConfig, autoDetect } from '../config';
 import { workspace } from 'vscode';
 
 const mockWorkspace = workspace as typeof workspace & {
@@ -89,14 +89,3 @@ describe('writeConfig', () => {
     });
 });
 
-describe('getScriptsRoot', () => {
-    it('returns pqSync.scriptsRoot when set', () => {
-        mockWorkspace._set('pqSync', 'scriptsRoot', '/custom/scripts/root');
-        expect(getScriptsRoot()).toBe('/custom/scripts/root');
-    });
-
-    it('returns null when setting absent and no workspace folders', () => {
-        // workspaceFolders is undefined in mock
-        expect(getScriptsRoot()).toBeNull();
-    });
-});
