@@ -6,6 +6,8 @@ import AdmZip from 'adm-zip';
 import { DOMParser } from '@xmldom/xmldom';
 import { spawnSync } from 'child_process';
 
+export const SENTINEL_FILE = '.pq-sync';
+
 // --- FUNCIONES AUXILIARES ---
 function cleanName(name: string): string {
     return name.replace(/[\\/*?:"<>|]/g, '_');
@@ -267,14 +269,17 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
     type ComQuery = { name: string; formula: string };
     const comQueries: ComQuery[] = JSON.parse(jsonOutput);
 
+    if (!fs.existsSync(outputRoot)) fs.mkdirSync(outputRoot, { recursive: true });
+
+    const sentinelPath = path.join(outputRoot, SENTINEL_FILE);
+    const sentinelExisted = fs.existsSync(sentinelPath);
+
     const existingPqFiles = new Set(collectPqFiles(outputRoot));
     // map query name → existing file path to preserve group folder location
     const nameToPath = new Map<string, string>();
     for (const pqPath of existingPqFiles) {
         nameToPath.set(path.basename(pqPath, '.pq'), pqPath);
     }
-
-    if (!fs.existsSync(outputRoot)) fs.mkdirSync(outputRoot, { recursive: true });
 
     const writtenFiles = new Set<string>();
     let changedCount = 0;
@@ -292,14 +297,9 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         changedCount++;
     }
 
-    let deletedCount = 0;
-    for (const existing of existingPqFiles) {
-        if (!writtenFiles.has(existing)) {
-            fs.unlinkSync(existing);
-            removeEmptyDirs(path.dirname(existing), outputRoot);
-            deletedCount++;
-        }
-    }
+    if (!sentinelExisted) fs.writeFileSync(sentinelPath, '');
+
+    const { deletedCount } = deleteOrphans(existingPqFiles, writtenFiles, outputRoot, sentinelExisted);
 
     console.log(`✅ ¡Éxito! Exportados: ${changedCount} modificados, ${unchangedCount} sin cambios → ${outputRoot}`);
     if (deletedCount > 0) console.log(`🗑️ Se eliminaron ${deletedCount} archivos obsoletos.`);
@@ -373,6 +373,11 @@ function extractMCode(xlsxPath: string, outputRoot: string): void {
         }
 
         // Extracción de código
+        if (!fs.existsSync(outputRoot)) fs.mkdirSync(outputRoot, { recursive: true });
+
+        const sentinelPath = path.join(outputRoot, SENTINEL_FILE);
+        const sentinelExisted = fs.existsSync(sentinelPath);
+
         const existingPqFiles = new Set(collectPqFiles(outputRoot));
         const writtenFiles = new Set<string>();
 
@@ -404,14 +409,9 @@ function extractMCode(xlsxPath: string, outputRoot: string): void {
             changedCount++;
         }
 
-        let deletedCount = 0;
-        for (const existing of existingPqFiles) {
-            if (!writtenFiles.has(existing)) {
-                fs.unlinkSync(existing);
-                removeEmptyDirs(path.dirname(existing), outputRoot);
-                deletedCount++;
-            }
-        }
+        if (!sentinelExisted) fs.writeFileSync(sentinelPath, '');
+
+        const { deletedCount } = deleteOrphans(existingPqFiles, writtenFiles, outputRoot, sentinelExisted);
 
         console.log(`✅ ¡Éxito! Exportados: ${changedCount} modificados, ${unchangedCount} sin cambios → ${outputRoot}`);
         if (deletedCount > 0) console.log(`🗑️ Se eliminaron ${deletedCount} archivos obsoletos.`);
@@ -419,46 +419,72 @@ function extractMCode(xlsxPath: string, outputRoot: string): void {
     } catch (e) { console.error("❌ Error fatal:", e); }
 }
 
+export function deleteOrphans(
+    existingPqFiles: Set<string>,
+    writtenFiles: Set<string>,
+    outputRoot: string,
+    sentinelExistedAtStart: boolean
+): { deletedCount: number; skipped: boolean } {
+    if (!sentinelExistedAtStart) {
+        console.error(
+            `mcodePath '${outputRoot}' has not been initialized by pq-sync. ` +
+            `Run pull on the correct directory first, or check your pqSync.mcodePath setting.`
+        );
+        return { deletedCount: 0, skipped: true };
+    }
+    let deletedCount = 0;
+    for (const existing of existingPqFiles) {
+        if (!writtenFiles.has(existing)) {
+            fs.unlinkSync(existing);
+            removeEmptyDirs(path.dirname(existing), outputRoot);
+            deletedCount++;
+        }
+    }
+    return { deletedCount, skipped: false };
+}
+
 // --- INTERFAZ ---
-const rawArgs = process.argv.slice(2);
-const comFlag = rawArgs.includes('--com');
-const directFlag = rawArgs.includes('--direct');
-const positional = rawArgs.filter(a => !a.startsWith('--'));
-const [cliExcelInput, cliOutputInput] = positional;
+if (require.main === module) {
+    const rawArgs = process.argv.slice(2);
+    const comFlag = rawArgs.includes('--com');
+    const directFlag = rawArgs.includes('--direct');
+    const positional = rawArgs.filter(a => !a.startsWith('--'));
+    const [cliExcelInput, cliOutputInput] = positional;
 
-function runExtract(excelInput: string, outputInput: string): void {
-    const xlsxPath = path.resolve(process.cwd(), excelInput);
-    const outputRoot = path.resolve(process.cwd(), outputInput);
+    function runExtract(excelInput: string, outputInput: string): void {
+        const xlsxPath = path.resolve(process.cwd(), excelInput);
+        const outputRoot = path.resolve(process.cwd(), outputInput);
 
-    let useCom = comFlag;
-    if (!comFlag && !directFlag) {
-        useCom = isWorkbookOpenInExcel(xlsxPath);
-        if (useCom) console.log('📡 Excel abierto detectado — extrayendo sin guardar (COM).');
+        let useCom = comFlag;
+        if (!comFlag && !directFlag) {
+            useCom = isWorkbookOpenInExcel(xlsxPath);
+            if (useCom) console.log('📡 Excel abierto detectado — extrayendo sin guardar (COM).');
+        }
+
+        if (useCom) {
+            extractMCodeViaCom(xlsxPath, outputRoot);
+        } else {
+            extractMCode(xlsxPath, outputRoot);
+        }
     }
 
-    if (useCom) {
-        extractMCodeViaCom(xlsxPath, outputRoot);
-    } else {
-        extractMCode(xlsxPath, outputRoot);
+    if (cliExcelInput || cliOutputInput) {
+        runExtract(
+            cliExcelInput || 'ShopifyMetrics/Metrics.xlsx',
+            cliOutputInput || 'ShopifyMetrics/MCode_Export/'
+        );
+        process.exit(0);
     }
-}
 
-if (cliExcelInput || cliOutputInput) {
-    runExtract(
-        cliExcelInput || 'ShopifyMetrics/Metrics.xlsx',
-        cliOutputInput || 'ShopifyMetrics/MCode_Export/'
-    );
-    process.exit(0);
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    async function iniciar() {
+        const excelInput = await new Promise<string>(r => rl.question('Archivo Excel [ShopifyMetrics/Metrics.xlsx]: ', r)) || 'ShopifyMetrics/Metrics.xlsx';
+        const outputInput = await new Promise<string>(r => rl.question('Carpeta destino [ShopifyMetrics/MCode_Export/]: ', r)) || 'ShopifyMetrics/MCode_Export/';
+        rl.close();
+        runExtract(excelInput, outputInput);
+    }
+    iniciar().catch(e => {
+        console.error("❌ Error fatal:", e);
+        process.exit(1);
+    });
 }
-
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-async function iniciar() {
-    const excelInput = await new Promise<string>(r => rl.question('Archivo Excel [ShopifyMetrics/Metrics.xlsx]: ', r)) || 'ShopifyMetrics/Metrics.xlsx';
-    const outputInput = await new Promise<string>(r => rl.question('Carpeta destino [ShopifyMetrics/MCode_Export/]: ', r)) || 'ShopifyMetrics/MCode_Export/';
-    rl.close();
-    runExtract(excelInput, outputInput);
-}
-iniciar().catch(e => {
-    console.error("❌ Error fatal:", e);
-    process.exit(1);
-});
