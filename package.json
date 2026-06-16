@@ -4,8 +4,14 @@
   "description": "Sync Power Query M code between Excel workbooks and .pq files",
   "version": "0.1.0",
   "publisher": "ricardodiaz",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/camconsultores/pq-sync"
+  },
+  "keywords": ["power query", "excel", "M code", "xlsx", "Power BI"],
   "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
+  "categories": ["Other", "Data Science"],
   "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
   "contributes": {
@@ -59,7 +65,7 @@
     "watch": "tsc -watch -p ./",
     "test": "jest",
     "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18 && esbuild scripts/extract_mcode.ts --bundle --outfile=dist/scripts/extract_mcode.js --format=cjs --platform=node --target=node18 && esbuild scripts/import_mcode.ts --bundle --outfile=dist/scripts/import_mcode.js --format=cjs --platform=node --target=node18",
-    "package": "vsce package --no-git-tag-version --allow-missing-repository"
+    "package": "vsce package --no-git-tag-version"
   },
   "dependencies": {
     "adm-zip": "^0.5.9",

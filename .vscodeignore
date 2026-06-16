@@ -1,5 +1,6 @@
 .vscode/**
 src/**
+scripts/**
 out/**
 node_modules/**
 **/*.ts
@@ -8,3 +9,6 @@ jest.config.js
 tsconfig.json
 issues/**
 PRD.md
+*.vsix
+.gitignore
+.vscodeignore

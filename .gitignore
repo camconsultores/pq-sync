@@ -2,3 +2,15 @@ node_modules/
 dist/
 out/
 *.vsix
+
+# workspace settings may contain absolute paths
+.vscode/settings.json
+
+# secrets
+.env
+.env.*
+local.settings.json
+*.key
+*.pem
+*.pfx
+*.p12
