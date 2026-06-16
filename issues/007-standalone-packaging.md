@@ -1,4 +1,12 @@
-## What to build
+## SUPERSEDED — 2026-06-16
+
+Option C (`pqSync.scriptsRoot`) was superseded when esbuild bundling was extended to cover scripts as well as the extension itself. Scripts now ship inside `dist/scripts/` with all dependencies inlined. The original dep-resolution objection to bundling (Option A rejection) no longer applies.
+
+Decision confirmed: bundled scripts are canonical. `pqSync.scriptsRoot` is removed. See issue #5 for implementation.
+
+---
+
+## What to build (historical)
 
 Extract `vscode-extension/` into its own git repository, bundle the extension with esbuild, and package as a `.vsix` installable from disk.
 
