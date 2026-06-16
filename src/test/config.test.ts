@@ -95,8 +95,8 @@ describe('getScriptsRoot', () => {
         expect(getScriptsRoot()).toBe('/custom/scripts/root');
     });
 
-    it('falls back to process.cwd() when setting absent and no workspace folders', () => {
+    it('returns null when setting absent and no workspace folders', () => {
         // workspaceFolders is undefined in mock
-        expect(getScriptsRoot()).toBe(process.cwd());
+        expect(getScriptsRoot()).toBeNull();
     });
 });

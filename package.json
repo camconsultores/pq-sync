@@ -49,7 +49,7 @@
         },
         "pqSync.scriptsRoot": {
           "type": "string",
-          "description": "Absolute path to the directory containing the scripts/ subfolder (extract_mcode.ts, import_mcode.ts). Defaults to workspace root."
+          "description": "Optional absolute path to an external scripts directory containing extract_mcode.ts and import_mcode.ts. When unset, the extension uses its bundled self-contained script binaries."
         }
       }
     }
@@ -58,8 +58,12 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "jest",
-    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18 && esbuild ../scripts/extract_mcode.ts --bundle --outfile=dist/scripts/extract_mcode.js --format=cjs --platform=node --target=node18 && esbuild ../scripts/import_mcode.ts --bundle --outfile=dist/scripts/import_mcode.js --format=cjs --platform=node --target=node18",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18 && esbuild scripts/extract_mcode.ts --bundle --outfile=dist/scripts/extract_mcode.js --format=cjs --platform=node --target=node18 && esbuild scripts/import_mcode.ts --bundle --outfile=dist/scripts/import_mcode.js --format=cjs --platform=node --target=node18",
     "package": "vsce package --no-git-tag-version --allow-missing-repository"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.9",
+    "@xmldom/xmldom": "^0.9.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",

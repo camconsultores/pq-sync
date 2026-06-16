@@ -23,11 +23,10 @@ export async function writeConfig(config: PqSyncConfig): Promise<void> {
     await cfg.update('mcodePath', config.mcodePath, vscode.ConfigurationTarget.Workspace);
 }
 
-export function getScriptsRoot(): string {
+export function getScriptsRoot(): string | null {
     const cfg = vscode.workspace.getConfiguration('pqSync');
     const override = cfg.get<string>('scriptsRoot');
-    if (override) return override;
-    return vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath ?? process.cwd();
+    return override ?? null;
 }
 
 export function autoDetect(workspaceRoot: string): PqSyncConfig | null {
