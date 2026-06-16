@@ -6,18 +6,11 @@ export interface RunResult {
     exitCode: number;
 }
 
-// shell: true on Windows joins args into a cmd.exe command string — quote each arg to
-// handle paths with spaces or other shell metacharacters.
-function quoteArg(arg: string): string {
-    return '"' + arg.replace(/"/g, '\\"') + '"';
-}
-
 export function run(command: string, args: string[], cwd: string): RunResult {
-    const quotedArgs = args.map(quoteArg);
-    const result = spawnSync(command, quotedArgs, {
+    const result = spawnSync(command, args, {
         encoding: 'utf8',
         cwd,
-        shell: true,
+        shell: false,
     });
     if (result.error) {
         throw result.error;

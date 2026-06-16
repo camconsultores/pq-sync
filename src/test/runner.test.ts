@@ -22,19 +22,29 @@ describe('runner.run', () => {
         expect(() => run('bad-cmd', [], '/cwd')).toThrow('spawn ENOENT');
     });
 
-    it('uses shell: true so npx resolves on Windows', () => {
+    it('uses shell: false so args bypass cmd.exe', () => {
         mockSpawn.mockReturnValue({ stdout: '', stderr: '', status: 0, error: undefined });
         run('npx', ['tsx'], '/cwd');
-        expect(mockSpawn).toHaveBeenCalledWith('npx', ['"tsx"'], expect.objectContaining({ shell: true }));
+        expect(mockSpawn).toHaveBeenCalledWith('npx', ['tsx'], expect.objectContaining({ shell: false }));
     });
 
-    it('quotes args containing spaces to prevent shell word-splitting', () => {
+    it('passes args with spaces verbatim without quoting', () => {
         mockSpawn.mockReturnValue({ stdout: '', stderr: '', status: 0, error: undefined });
-        run('npx', ['tsx', 'C:\\path with spaces\\file.ts'], '/cwd');
+        run('node', ['C:\\path with spaces\\file.js'], '/cwd');
         expect(mockSpawn).toHaveBeenCalledWith(
-            'npx',
-            ['"tsx"', '"C:\\path with spaces\\file.ts"'],
-            expect.objectContaining({ shell: true }),
+            'node',
+            ['C:\\path with spaces\\file.js'],
+            expect.objectContaining({ shell: false }),
+        );
+    });
+
+    it('passes cmd.exe metacharacters verbatim, not expanded', () => {
+        mockSpawn.mockReturnValue({ stdout: '', stderr: '', status: 0, error: undefined });
+        run('node', ['%TEMP%', '^', '&'], '/cwd');
+        expect(mockSpawn).toHaveBeenCalledWith(
+            'node',
+            ['%TEMP%', '^', '&'],
+            expect.objectContaining({ shell: false }),
         );
     });
 
