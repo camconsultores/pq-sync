@@ -9,19 +9,50 @@
     "type": "git",
     "url": "https://github.com/camconsultores/pq-sync"
   },
-  "keywords": ["power query", "excel", "M code", "xlsx", "Power BI"],
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other", "Data Science"],
-  "activationEvents": ["onStartupFinished"],
+  "keywords": [
+    "power query",
+    "excel",
+    "M code",
+    "xlsx",
+    "Power BI"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Data Science"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      { "command": "pq-sync.pull", "title": "pq-sync: Pull from Excel" },
-      { "command": "pq-sync.push", "title": "pq-sync: Push to Excel" },
-      { "command": "pq-sync.configure", "title": "pq-sync: Configure" },
-      { "command": "pq-sync.pushQuery", "title": "pq-sync: Push this query" },
-      { "command": "pq-sync.pullFromFolder", "title": "pq-sync: Pull from Excel" },
-      { "command": "pq-sync.pushFromFolder", "title": "pq-sync: Push to Excel" }
+      {
+        "command": "pq-sync.pull",
+        "title": "pq-sync: Pull from Excel"
+      },
+      {
+        "command": "pq-sync.push",
+        "title": "pq-sync: Push to Excel"
+      },
+      {
+        "command": "pq-sync.configure",
+        "title": "pq-sync: Configure"
+      },
+      {
+        "command": "pq-sync.pushQuery",
+        "title": "pq-sync: Push this query"
+      },
+      {
+        "command": "pq-sync.pullFromFolder",
+        "title": "pq-sync: Pull from Excel"
+      },
+      {
+        "command": "pq-sync.pushFromFolder",
+        "title": "pq-sync: Push to Excel"
+      }
     ],
     "menus": {
       "explorer/context": [
@@ -68,10 +99,11 @@
     "package": "vsce package --no-git-tag-version"
   },
   "dependencies": {
-    "adm-zip": "^0.5.9",
-    "@xmldom/xmldom": "^0.9.0"
+    "@xmldom/xmldom": "^0.9.0",
+    "adm-zip": "^0.5.9"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/jest": "^29.5.0",
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.85.0",
