@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.1] - 2026-06-17
+
+### Fixed
+- COM extraction (`extractMCodeViaCom`): base64-encode formula strings before `ConvertTo-Json` so M code containing unescaped double-quotes or special Unicode characters (e.g. in comments) no longer causes `SyntaxError: Expected ',' or '}'` on `JSON.parse`
+
 ## [0.1.0] - 2026-06-16
 
 ### Added

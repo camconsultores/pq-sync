@@ -2,7 +2,7 @@
   "name": "pq-sync",
   "displayName": "pq-sync",
   "description": "Sync Power Query M code between Excel workbooks and .pq files",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "ricardodiaz",
   "license": "MIT",
   "icon": "icon.png",

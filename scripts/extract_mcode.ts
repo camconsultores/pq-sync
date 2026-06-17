@@ -245,7 +245,9 @@ if ($null -eq $Workbook) { throw "El libro no esta abierto en Excel: $TargetPath
 
 $Result = @()
 foreach ($Query in @($Workbook.Queries)) {
-    $Result += [PSCustomObject]@{ name = [string]$Query.Name; formula = [string]$Query.Formula }
+    $formulaBytes = [System.Text.Encoding]::UTF8.GetBytes([string]$Query.Formula)
+    $formulaB64   = [System.Convert]::ToBase64String($formulaBytes)
+    $Result += [PSCustomObject]@{ name = [string]$Query.Name; formula = $formulaB64 }
 }
 
 if ($Result.Count -eq 0) { Write-Output '[]'; exit 0 }
@@ -267,7 +269,9 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
     }
 
     type ComQuery = { name: string; formula: string };
-    const comQueries: ComQuery[] = JSON.parse(jsonOutput);
+    const comQueries: ComQuery[] = JSON.parse(jsonOutput).map(
+        (q: ComQuery) => ({ name: q.name, formula: Buffer.from(q.formula, 'base64').toString('utf8') })
+    );
 
     if (!fs.existsSync(outputRoot)) fs.mkdirSync(outputRoot, { recursive: true });
 
