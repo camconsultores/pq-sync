@@ -2,6 +2,8 @@ node_modules/
 dist/
 out/
 *.vsix
+scripts/*.js
+scripts/*.js.map
 
 # workspace settings may contain absolute paths
 .vscode/settings.json
