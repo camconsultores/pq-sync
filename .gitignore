@@ -16,3 +16,6 @@ local.settings.json
 *.pem
 *.pfx
 *.p12
+
+
+local-dev.md
