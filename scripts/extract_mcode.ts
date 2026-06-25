@@ -25,6 +25,11 @@ function getFullGroupPath(groupId: string, groupsDict: Record<string, any>): str
     return currentPath;
 }
 
+export function matchesGroupFilter(groupRelPath: string, filter: string): boolean {
+    if (!filter) return true;
+    return groupRelPath === filter || groupRelPath.startsWith(filter + path.sep);
+}
+
 function decodeXmlBuffer(buffer: Buffer): string {
     const cleanXmlStart = (value: string): string =>
         value.replace(/^[﻿\x00\s]+(?=<\?xml|<)/, '');
@@ -238,7 +243,7 @@ function isWorkbookOpenInExcel(workbookPath: string): boolean {
 }
 
 // --- RUTA COM (Excel abierto, sin guardar) ---
-function extractMCodeViaCom(xlsxPath: string, outputRoot: string): void {
+function extractMCodeViaCom(xlsxPath: string, outputRoot: string, groupFilter: string = ''): void {
     console.log(`\n📂 Procesando (COM): ${xlsxPath}`);
 
     const scriptPath = path.join(os.tmpdir(), `extract-mcode-com-${process.pid}.ps1`);
@@ -298,10 +303,11 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
 
     if (!fs.existsSync(outputRoot)) fs.mkdirSync(outputRoot, { recursive: true });
 
-    const sentinelPath = path.join(outputRoot, SENTINEL_FILE);
+    const scopeDir = groupFilter ? path.join(outputRoot, groupFilter) : outputRoot;
+    const sentinelPath = path.join(scopeDir, SENTINEL_FILE);
     const sentinelExisted = fs.existsSync(sentinelPath);
 
-    const existingPqFiles = new Set(collectPqFiles(outputRoot));
+    const existingPqFiles = new Set(collectPqFiles(scopeDir));
     const nameToPath = new Map<string, string>();
     for (const pqPath of existingPqFiles) {
         nameToPath.set(path.basename(pqPath, '.pq'), pqPath);
@@ -341,6 +347,9 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
     let unchangedCount = 0;
     for (const { name, formula } of comQueries) {
         if (ignore(name)) continue;
+        const groupId = queryToGroup[name];
+        const groupRelPath = groupId ? getFullGroupPath(groupId, queryGroups) : '';
+        if (!matchesGroupFilter(groupRelPath, groupFilter)) continue;
         const outPath = resolveOutputPath(name, outputRoot, nameToPath, queryToGroup, queryGroups);
         const dir = path.dirname(outPath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -364,7 +373,7 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
 }
 
 // --- RUTA DIRECTA (ZIP desde disco) ---
-function extractMCode(xlsxPath: string, outputRoot: string): void {
+function extractMCode(xlsxPath: string, outputRoot: string, groupFilter: string = ''): void {
     console.log(`\n📂 Procesando: ${xlsxPath}`);
 
     try {
@@ -433,10 +442,11 @@ function extractMCode(xlsxPath: string, outputRoot: string): void {
         // Extracción de código
         if (!fs.existsSync(outputRoot)) fs.mkdirSync(outputRoot, { recursive: true });
 
-        const sentinelPath = path.join(outputRoot, SENTINEL_FILE);
+        const scopeDir = groupFilter ? path.join(outputRoot, groupFilter) : outputRoot;
+        const sentinelPath = path.join(scopeDir, SENTINEL_FILE);
         const sentinelExisted = fs.existsSync(sentinelPath);
 
-        const existingPqFiles = new Set(collectPqFiles(outputRoot));
+        const existingPqFiles = new Set(collectPqFiles(scopeDir));
         const ignore = loadIgnoreList(outputRoot);
         const writtenFiles = new Set<string>();
         // Protect ignored files from orphan deletion
@@ -459,7 +469,9 @@ function extractMCode(xlsxPath: string, outputRoot: string): void {
             const normalized = normalizeForCompare(stripMetadata(parts.slice(1).join('=')));
 
             const qGroupId = queryToGroup[name];
-            const folderPath = path.join(outputRoot, qGroupId ? getFullGroupPath(qGroupId, queryGroups) : '');
+            const groupRelPath = qGroupId ? getFullGroupPath(qGroupId, queryGroups) : '';
+            if (!matchesGroupFilter(groupRelPath, groupFilter)) continue;
+            const folderPath = path.join(outputRoot, groupRelPath);
 
             if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
             const outPath = path.resolve(folderPath, `${cleanName(name)}.pq`);
@@ -512,7 +524,9 @@ if (require.main === module) {
     const rawArgs = process.argv.slice(2);
     const comFlag = rawArgs.includes('--com');
     const directFlag = rawArgs.includes('--direct');
-    const positional = rawArgs.filter(a => !a.startsWith('--'));
+    const groupIdx = rawArgs.indexOf('--group');
+    const groupFilter = groupIdx >= 0 ? (rawArgs[groupIdx + 1] ?? '') : '';
+    const positional = rawArgs.filter((a, i) => !a.startsWith('--') && rawArgs[i - 1] !== '--group');
     const [cliExcelInput, cliOutputInput] = positional;
 
     function runExtract(excelInput: string, outputInput: string): void {
@@ -526,9 +540,9 @@ if (require.main === module) {
         }
 
         if (useCom) {
-            extractMCodeViaCom(xlsxPath, outputRoot);
+            extractMCodeViaCom(xlsxPath, outputRoot, groupFilter);
         } else {
-            extractMCode(xlsxPath, outputRoot);
+            extractMCode(xlsxPath, outputRoot, groupFilter);
         }
     }
 
