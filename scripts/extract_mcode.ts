@@ -199,6 +199,17 @@ function collectPqFiles(dir: string): string[] {
     return results;
 }
 
+export function collectRootPqFiles(dir: string): string[] {
+    if (!fs.existsSync(dir)) return [];
+    const results: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (!entry.isDirectory() && entry.name.endsWith('.pq')) {
+            results.push(path.resolve(path.join(dir, entry.name)));
+        }
+    }
+    return results;
+}
+
 function stripMetadata(formula: string): string {
     const trimmed = formula.trim();
     const lastSemi = trimmed.lastIndexOf(';');
@@ -306,6 +317,7 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
     const scopeDir = groupFilter ? path.join(outputRoot, groupFilter) : outputRoot;
     const sentinelPath = path.join(scopeDir, SENTINEL_FILE);
     const sentinelExisted = fs.existsSync(sentinelPath);
+    const rootSentinelExisted = groupFilter ? fs.existsSync(path.join(outputRoot, SENTINEL_FILE)) : sentinelExisted;
 
     const existingPqFiles = new Set(collectPqFiles(scopeDir));
     const nameToPath = new Map<string, string>();
@@ -378,8 +390,19 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         fs.writeFileSync(sentinelPath, '');
     }
 
-    const { deletedCount } = deleteOrphans(existingPqFiles, writtenFiles, outputRoot, sentinelExisted);
+    const { deletedCount: phase1Count } = deleteOrphans(existingPqFiles, writtenFiles, outputRoot, sentinelExisted);
 
+    let phase2Count = 0;
+    if (groupFilter) {
+        const rootPqFiles = collectRootPqFiles(outputRoot);
+        for (const pqPath of rootPqFiles) {
+            if (ignore(path.basename(pqPath, '.pq'))) writtenFiles.add(pqPath);
+        }
+        const { deletedCount } = deleteOrphans(new Set(rootPqFiles), writtenFiles, outputRoot, rootSentinelExisted);
+        phase2Count = deletedCount;
+    }
+
+    const deletedCount = phase1Count + phase2Count;
     console.log(`✅ ¡Éxito! Exportados: ${changedCount} modificados, ${unchangedCount} sin cambios → ${outputRoot}`);
     if (deletedCount > 0) console.log(`🗑️ Se eliminaron ${deletedCount} archivos obsoletos.`);
 }
@@ -457,6 +480,7 @@ function extractMCode(xlsxPath: string, outputRoot: string, groupFilter: string 
         const scopeDir = groupFilter ? path.join(outputRoot, groupFilter) : outputRoot;
         const sentinelPath = path.join(scopeDir, SENTINEL_FILE);
         const sentinelExisted = fs.existsSync(sentinelPath);
+        const rootSentinelExisted = groupFilter ? fs.existsSync(path.join(outputRoot, SENTINEL_FILE)) : sentinelExisted;
 
         const existingPqFiles = new Set(collectPqFiles(scopeDir));
         const ignore = loadIgnoreList(outputRoot);
@@ -506,8 +530,19 @@ function extractMCode(xlsxPath: string, outputRoot: string, groupFilter: string 
             fs.writeFileSync(sentinelPath, '');
         }
 
-        const { deletedCount } = deleteOrphans(existingPqFiles, writtenFiles, outputRoot, sentinelExisted);
+        const { deletedCount: phase1Count } = deleteOrphans(existingPqFiles, writtenFiles, outputRoot, sentinelExisted);
 
+        let phase2Count = 0;
+        if (groupFilter) {
+            const rootPqFiles = collectRootPqFiles(outputRoot);
+            for (const pqPath of rootPqFiles) {
+                if (ignore(path.basename(pqPath, '.pq'))) writtenFiles.add(pqPath);
+            }
+            const { deletedCount } = deleteOrphans(new Set(rootPqFiles), writtenFiles, outputRoot, rootSentinelExisted);
+            phase2Count = deletedCount;
+        }
+
+        const deletedCount = phase1Count + phase2Count;
         console.log(`✅ ¡Éxito! Exportados: ${changedCount} modificados, ${unchangedCount} sin cambios → ${outputRoot}`);
         if (deletedCount > 0) console.log(`🗑️ Se eliminaron ${deletedCount} archivos obsoletos.`);
 
