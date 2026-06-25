@@ -7,6 +7,7 @@ let
             {4, "2024-01-04", "Product B", 75}
         },
         type table [ID = Int64.Type, Date = text, Product = text, Qty = Int64.Type]
-    )
+    ),
+    #"Filtered Rows" = Table.SelectRows(Source, each ([Product] = "Product A"))
 in
-    Source
+    #"Filtered Rows"
