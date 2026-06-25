@@ -12,3 +12,6 @@ PRD.md
 *.vsix
 .gitignore
 .vscodeignore
+.env
+CONTEXT.md
+docs/**

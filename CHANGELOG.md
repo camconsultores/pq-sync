@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.0] - 2026-06-25
+
+### Added
+- `.pqignore` file support: place filename patterns (with `*` wildcard) in the MCode Folder root to exclude queries from push and pull. Ignored files are never written, overwritten, or deleted as orphans
+- Subdirectory push: right-click any Group subfolder → Push from Folder syncs only `.pq` files in that subtree to Excel
+- Subdirectory pull: right-click any Group subfolder → Pull from Folder extracts only queries belonging to that Group (and nested Groups), with scoped sentinel and orphan deletion
+
+### Fixed
+- COM route (Excel open): new queries are now placed in their correct Group subfolder instead of always landing in the MCode Folder root. Group metadata is read from the saved `.xlsx`; formulas still come from the live COM session
+
 ## [0.1.1] - 2026-06-17
 
 ### Fixed
