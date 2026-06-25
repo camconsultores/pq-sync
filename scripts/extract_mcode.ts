@@ -349,8 +349,12 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         if (ignore(name)) continue;
         const groupId = queryToGroup[name];
         const groupRelPath = groupId ? getFullGroupPath(groupId, queryGroups) : '';
-        if (!matchesGroupFilter(groupRelPath, groupFilter)) continue;
-        const outPath = resolveOutputPath(name, outputRoot, nameToPath, queryToGroup, queryGroups);
+        const isUngrouped = !groupRelPath;
+        const inScope = matchesGroupFilter(groupRelPath, groupFilter);
+        if (!inScope && !isUngrouped) continue;
+        const outPath = isUngrouped
+            ? path.resolve(outputRoot, `${cleanName(name)}.pq`)
+            : resolveOutputPath(name, outputRoot, nameToPath, queryToGroup, queryGroups);
         const dir = path.dirname(outPath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         const normalized = normalizeForCompare(stripMetadata(formula));
@@ -364,7 +368,10 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         changedCount++;
     }
 
-    if (!sentinelExisted) fs.writeFileSync(sentinelPath, '');
+    if (!sentinelExisted) {
+        fs.mkdirSync(path.dirname(sentinelPath), { recursive: true });
+        fs.writeFileSync(sentinelPath, '');
+    }
 
     const { deletedCount } = deleteOrphans(existingPqFiles, writtenFiles, outputRoot, sentinelExisted);
 
@@ -470,11 +477,15 @@ function extractMCode(xlsxPath: string, outputRoot: string, groupFilter: string 
 
             const qGroupId = queryToGroup[name];
             const groupRelPath = qGroupId ? getFullGroupPath(qGroupId, queryGroups) : '';
-            if (!matchesGroupFilter(groupRelPath, groupFilter)) continue;
-            const folderPath = path.join(outputRoot, groupRelPath);
+            const isUngrouped = !groupRelPath;
+            const inScope = matchesGroupFilter(groupRelPath, groupFilter);
+            if (!inScope && !isUngrouped) continue;
+            const outPath = isUngrouped
+                ? path.resolve(outputRoot, `${cleanName(name)}.pq`)
+                : path.resolve(path.join(outputRoot, groupRelPath), `${cleanName(name)}.pq`);
+            const folderPath = path.dirname(outPath);
 
             if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
-            const outPath = path.resolve(folderPath, `${cleanName(name)}.pq`);
             writtenFiles.add(outPath);
 
             const existingContent = fs.existsSync(outPath)
@@ -485,7 +496,10 @@ function extractMCode(xlsxPath: string, outputRoot: string, groupFilter: string 
             changedCount++;
         }
 
-        if (!sentinelExisted) fs.writeFileSync(sentinelPath, '');
+        if (!sentinelExisted) {
+            fs.mkdirSync(path.dirname(sentinelPath), { recursive: true });
+            fs.writeFileSync(sentinelPath, '');
+        }
 
         const { deletedCount } = deleteOrphans(existingPqFiles, writtenFiles, outputRoot, sentinelExisted);
 
