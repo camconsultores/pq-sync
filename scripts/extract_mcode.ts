@@ -188,7 +188,7 @@ export function resolveOutputPath(
     return path.resolve(outputRoot, `${cleanName(name)}.pq`);
 }
 
-function collectPqFiles(dir: string): string[] {
+export function collectPqFiles(dir: string): string[] {
     if (!fs.existsSync(dir)) return [];
     const results: string[] = [];
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -206,6 +206,19 @@ export function collectRootPqFiles(dir: string): string[] {
         if (!entry.isDirectory() && entry.name.endsWith('.pq')) {
             results.push(path.resolve(path.join(dir, entry.name)));
         }
+    }
+    return results;
+}
+
+export function collectSiblingGroupDirs(outputRoot: string, scopeDir: string): string[] {
+    if (!fs.existsSync(outputRoot)) return [];
+    const resolvedScope = path.resolve(scopeDir);
+    const results: string[] = [];
+    for (const entry of fs.readdirSync(outputRoot, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const fullPath = path.resolve(path.join(outputRoot, entry.name));
+        if (fullPath === resolvedScope) continue;
+        results.push(fullPath);
     }
     return results;
 }
@@ -402,7 +415,25 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         phase2Count = deletedCount;
     }
 
-    const deletedCount = phase1Count + phase2Count;
+    let phase3Count = 0;
+    if (groupFilter) {
+        const writtenNames = new Set([...writtenFiles].map(p => path.basename(p, '.pq')));
+        for (const siblingDir of collectSiblingGroupDirs(outputRoot, scopeDir)) {
+            const siblingFiles = collectPqFiles(siblingDir);
+            for (const pqPath of siblingFiles) {
+                if (ignore(path.basename(pqPath, '.pq'))) writtenFiles.add(pqPath);
+            }
+            if (!fs.existsSync(path.join(siblingDir, SENTINEL_FILE))) continue;
+            // Only delete files whose query was written elsewhere this pull (moved out of sibling group)
+            const stale = new Set(siblingFiles.filter(
+                p => writtenNames.has(path.basename(p, '.pq')) && !writtenFiles.has(p)
+            ));
+            const { deletedCount } = deleteOrphans(stale, writtenFiles, outputRoot, true);
+            phase3Count += deletedCount;
+        }
+    }
+
+    const deletedCount = phase1Count + phase2Count + phase3Count;
     console.log(`✅ ¡Éxito! Exportados: ${changedCount} modificados, ${unchangedCount} sin cambios → ${outputRoot}`);
     if (deletedCount > 0) console.log(`🗑️ Se eliminaron ${deletedCount} archivos obsoletos.`);
 }
@@ -542,7 +573,25 @@ function extractMCode(xlsxPath: string, outputRoot: string, groupFilter: string 
             phase2Count = deletedCount;
         }
 
-        const deletedCount = phase1Count + phase2Count;
+        let phase3Count = 0;
+        if (groupFilter) {
+            const writtenNames = new Set([...writtenFiles].map(p => path.basename(p, '.pq')));
+            for (const siblingDir of collectSiblingGroupDirs(outputRoot, scopeDir)) {
+                const siblingFiles = collectPqFiles(siblingDir);
+                for (const pqPath of siblingFiles) {
+                    if (ignore(path.basename(pqPath, '.pq'))) writtenFiles.add(pqPath);
+                }
+                if (!fs.existsSync(path.join(siblingDir, SENTINEL_FILE))) continue;
+                // Only delete files whose query was written elsewhere this pull (moved out of sibling group)
+                const stale = new Set(siblingFiles.filter(
+                    p => writtenNames.has(path.basename(p, '.pq')) && !writtenFiles.has(p)
+                ));
+                const { deletedCount } = deleteOrphans(stale, writtenFiles, outputRoot, true);
+                phase3Count += deletedCount;
+            }
+        }
+
+        const deletedCount = phase1Count + phase2Count + phase3Count;
         console.log(`✅ ¡Éxito! Exportados: ${changedCount} modificados, ${unchangedCount} sin cambios → ${outputRoot}`);
         if (deletedCount > 0) console.log(`🗑️ Se eliminaron ${deletedCount} archivos obsoletos.`);
 
