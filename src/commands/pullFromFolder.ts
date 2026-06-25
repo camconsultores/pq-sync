@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { readConfig } from '../config';
 import { run } from '../runner';
@@ -14,10 +15,10 @@ export async function pullFromFolderCommand(
         vscode.window.showErrorMessage('pq-sync: No config found. Run pq-sync: Configure first.');
         return;
     }
-    if (uri.fsPath !== config.mcodePath) {
-        vscode.window.showErrorMessage(
-            'pq-sync: This folder is not the configured mcode folder. Run pq-sync: Configure to change it.',
-        );
+
+    const rel = path.relative(config.mcodePath, uri.fsPath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        vscode.window.showErrorMessage('pq-sync: Selected folder is not inside the configured mcode folder.');
         return;
     }
 
@@ -28,7 +29,8 @@ export async function pullFromFolderCommand(
     let result;
     try {
         const script = getScriptInvocation('extract_mcode.ts');
-        result = run(script.command, [...script.args, config.workbookPath, config.mcodePath], workspaceRoot());
+        const groupArgs = rel ? ['--group', rel] : [];
+        result = run(script.command, [...script.args, config.workbookPath, config.mcodePath, ...groupArgs], workspaceRoot());
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         statusBar.setState('error');
