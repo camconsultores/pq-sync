@@ -70,6 +70,16 @@ git tag vX.Y.Z
 git push && git push --tags
 ```
 
+## Force-update in VS Code (local install)
+
+Marketplace propagation takes ~5 minutes. To install immediately from the `.vsix`:
+
+1. `Ctrl+Shift+P` → **Extensions: Show Installed Extensions**
+2. Find `pq-sync` → click ⚙️ → **Uninstall**
+3. `Ctrl+Shift+P` → **Extensions: Install from VSIX...** → select `pq-sync-X.Y.Z.vsix`
+
+Or wait and run `Ctrl+Shift+P` → **Extensions: Check for Extension Updates** once marketplace propagates.
+
 ## Troubleshooting
 
 | Error | Fix |

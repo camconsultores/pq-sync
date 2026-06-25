@@ -19,3 +19,7 @@ local.settings.json
 
 
 local-dev.md
+
+# test-fixture runtime outputs (created during manual test runs, not committed)
+test-fixtures/mcode/
+test-fixtures/mcode-groups/
