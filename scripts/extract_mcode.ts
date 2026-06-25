@@ -5,6 +5,7 @@ import * as readline from 'readline';
 import AdmZip from 'adm-zip';
 import { DOMParser } from '@xmldom/xmldom';
 import { spawnSync } from 'child_process';
+import { loadIgnoreList } from './ignore_list';
 
 export const SENTINEL_FILE = '.pq-sync';
 
@@ -285,10 +286,17 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         nameToPath.set(path.basename(pqPath, '.pq'), pqPath);
     }
 
+    const ignore = loadIgnoreList(outputRoot);
     const writtenFiles = new Set<string>();
+    // Protect ignored files from orphan deletion
+    for (const pqPath of existingPqFiles) {
+        if (ignore(path.basename(pqPath, '.pq'))) writtenFiles.add(path.resolve(pqPath));
+    }
+
     let changedCount = 0;
     let unchangedCount = 0;
     for (const { name, formula } of comQueries) {
+        if (ignore(name)) continue;
         const outPath = nameToPath.get(name) ?? path.resolve(outputRoot, `${cleanName(name)}.pq`);
         const normalized = normalizeForCompare(stripMetadata(formula));
         const resolvedPath = path.resolve(outPath);
@@ -383,7 +391,12 @@ function extractMCode(xlsxPath: string, outputRoot: string): void {
         const sentinelExisted = fs.existsSync(sentinelPath);
 
         const existingPqFiles = new Set(collectPqFiles(outputRoot));
+        const ignore = loadIgnoreList(outputRoot);
         const writtenFiles = new Set<string>();
+        // Protect ignored files from orphan deletion
+        for (const pqPath of existingPqFiles) {
+            if (ignore(path.basename(pqPath, '.pq'))) writtenFiles.add(path.resolve(pqPath));
+        }
 
         let mCodeRaw = mCodeEntry.getData().toString('utf8').replace(/^section\s+Section1;\s*/i, '').trim();
         const queries = mCodeRaw.replace(/^shared\s+/i, '').split(/\r?\nshared\s+/);
@@ -396,6 +409,7 @@ function extractMCode(xlsxPath: string, outputRoot: string): void {
             if (parts.length < 2) continue;
 
             let name = parts[0].trim().replace(/^#"/, '').replace(/"$/, '');
+            if (ignore(name)) continue;
             const normalized = normalizeForCompare(stripMetadata(parts.slice(1).join('=')));
 
             const qGroupId = queryToGroup[name];

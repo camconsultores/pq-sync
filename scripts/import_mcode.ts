@@ -4,6 +4,7 @@ import * as path from 'path';
 import { spawnSync } from 'child_process';
 import AdmZip from 'adm-zip';
 import { DOMParser } from '@xmldom/xmldom';
+import { loadIgnoreList } from './ignore_list';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,12 +64,13 @@ function stripQueryMetadata(value: string): string {
     return trimmed.replace(/;$/, '').trim();
 }
 
-function readImportedQueries(inputRoot: string): ImportedQuery[] {
+function readImportedQueries(inputRoot: string, ignore: (name: string) => boolean = () => false): ImportedQuery[] {
     const seen = new Set<string>();
     const imported: ImportedQuery[] = [];
 
     for (const filePath of collectTxtFiles(inputRoot)) {
         const name = path.basename(filePath, '.pq');
+        if (ignore(name)) continue;
         const formula = stripQueryMetadata(fs.readFileSync(filePath, 'utf8'));
 
         if (seen.has(name)) {
@@ -557,7 +559,8 @@ try {
         throw new Error(`M code folder not found: ${mcodePath}`);
     }
 
-    let imported = readImportedQueries(mcodePath);
+    const ignore = loadIgnoreList(mcodePath);
+    let imported = readImportedQueries(mcodePath, ignore);
 
     if (queryName !== undefined) {
         const match = imported.find(q => q.name === queryName);
