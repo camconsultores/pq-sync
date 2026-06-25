@@ -345,6 +345,7 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
 
     let changedCount = 0;
     let unchangedCount = 0;
+    let rootUngroupedCount = 0;
     for (const { name, formula } of comQueries) {
         if (ignore(name)) continue;
         const groupId = queryToGroup[name];
@@ -352,6 +353,7 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         const isUngrouped = !groupRelPath;
         const inScope = matchesGroupFilter(groupRelPath, groupFilter);
         if (!inScope && !isUngrouped) continue;
+        if (isUngrouped) rootUngroupedCount++;
         const outPath = isUngrouped
             ? path.resolve(outputRoot, `${cleanName(name)}.pq`)
             : resolveOutputPath(name, outputRoot, nameToPath, queryToGroup, queryGroups);
@@ -367,6 +369,9 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         fs.writeFileSync(outPath, normalized, 'utf8');
         changedCount++;
     }
+
+    const rootWarning = buildUngroupedRootWarning(rootUngroupedCount);
+    if (rootWarning) console.warn(rootWarning);
 
     if (!sentinelExisted) {
         fs.mkdirSync(path.dirname(sentinelPath), { recursive: true });
@@ -507,6 +512,12 @@ function extractMCode(xlsxPath: string, outputRoot: string, groupFilter: string 
         if (deletedCount > 0) console.log(`🗑️ Se eliminaron ${deletedCount} archivos obsoletos.`);
 
     } catch (e) { console.error("❌ Error fatal:", e); }
+}
+
+export function buildUngroupedRootWarning(count: number): string | null {
+    if (count === 0) return null;
+    const noun = count === 1 ? 'query' : 'queries';
+    return `⚠ ${count} ${noun} placed at mcode root — save the workbook before pulling to honour group placement.`;
 }
 
 export function deleteOrphans(
