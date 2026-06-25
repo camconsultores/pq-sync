@@ -160,6 +160,28 @@ function parseMetadataGroups(mashupPayload: Buffer): {
     return { queryGroups, queryToGroup };
 }
 
+export function resolveOutputPath(
+    name: string,
+    outputRoot: string,
+    nameToPath: Map<string, string>,
+    queryToGroup: Record<string, string>,
+    queryGroups: Record<string, any>
+): string {
+    const existing = nameToPath.get(name);
+    if (existing) return existing;
+
+    const groupId = queryToGroup[name];
+    if (groupId) {
+        const groupPath = getFullGroupPath(groupId, queryGroups);
+        if (groupPath) {
+            return path.resolve(outputRoot, groupPath, `${cleanName(name)}.pq`);
+        }
+    }
+
+    // Fallback: mcode root — known limitation when .xlsx unreadable; see #13
+    return path.resolve(outputRoot, `${cleanName(name)}.pq`);
+}
+
 function collectPqFiles(dir: string): string[] {
     if (!fs.existsSync(dir)) return [];
     const results: string[] = [];
@@ -279,17 +301,41 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
     const sentinelExisted = fs.existsSync(sentinelPath);
 
     const existingPqFiles = new Set(collectPqFiles(outputRoot));
-    // map query name → existing file path to preserve group folder location
     const nameToPath = new Map<string, string>();
     for (const pqPath of existingPqFiles) {
         nameToPath.set(path.basename(pqPath, '.pq'), pqPath);
+    }
+
+    // Read group metadata from saved .xlsx for correct subfolder placement of new queries.
+    // Formulas come from COM (unsaved changes); group assignments come from disk (saved state).
+    let queryToGroup: Record<string, string> = {};
+    let queryGroups: Record<string, any> = {};
+    try {
+        const excelZip = new AdmZip(xlsxPath);
+        for (const entry of excelZip.getEntries()) {
+            if (entry.entryName.startsWith('customXml/') && entry.entryName.endsWith('.xml')) {
+                const content = decodeXmlBuffer(entry.getData());
+                const b64 = getMashupBase64FromXml(content);
+                if (b64) {
+                    const meta = parseMetadataGroups(Buffer.from(b64, 'base64'));
+                    queryToGroup = meta.queryToGroup;
+                    queryGroups = meta.queryGroups;
+                    break;
+                }
+            }
+        }
+    } catch {
+        // .xlsx unreadable (e.g. write-locked): fall back to nameToPath placement.
+        // New queries with no saved metadata land in mcode root — known limitation, see #13.
     }
 
     const writtenFiles = new Set<string>();
     let changedCount = 0;
     let unchangedCount = 0;
     for (const { name, formula } of comQueries) {
-        const outPath = nameToPath.get(name) ?? path.resolve(outputRoot, `${cleanName(name)}.pq`);
+        const outPath = resolveOutputPath(name, outputRoot, nameToPath, queryToGroup, queryGroups);
+        const dir = path.dirname(outPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         const normalized = normalizeForCompare(stripMetadata(formula));
         const resolvedPath = path.resolve(outPath);
         writtenFiles.add(resolvedPath);
