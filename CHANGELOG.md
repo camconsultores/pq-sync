@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0] - 2026-06-25
+
+### Fixed
+- Rename detection: renaming a query in the Power Query Editor now keeps the `.pq` file in its group subfolder instead of moving it to the MCode root. Detection uses a three-step fallback — group metadata lookup, same-name file lookup, content match — so it survives stale mashup binaries
+- `stripMetadata` now strips trailing `[Query="Name"]` annotations appended without a preceding semicolon, which is the standard format in current Excel versions. Previously these annotations differed between old and new query names, causing false content mismatches on rename
+- Disk `.pq` files are now read through `stripMetadata` before comparison so old files written with embedded annotations compare correctly against freshly extracted formulas
+
+### Known Limitation
+- Rename detection does not work while the **Power Query Editor UI is open** in Excel. The PQ Editor holds the mashup binary in memory and prevents the group metadata from being flushed to the `.xlsx` during pull. Workaround: close the PQ Editor, then pull
+
 ## [0.2.0] - 2026-06-25
 
 ### Added

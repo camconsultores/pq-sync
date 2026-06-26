@@ -223,7 +223,7 @@ export function collectSiblingGroupDirs(outputRoot: string, scopeDir: string): s
     return results;
 }
 
-function stripMetadata(formula: string): string {
+export function stripMetadata(formula: string): string {
     const trimmed = formula.trim();
     const lastSemi = trimmed.lastIndexOf(';');
     if (lastSemi >= 0) {
@@ -233,7 +233,11 @@ function stripMetadata(formula: string): string {
             return trimmed.slice(0, lastSemi).trim();
         }
     }
-    return trimmed.replace(/;$/, '').trim();
+    // Also strip trailing Excel metadata annotations without a preceding ';'
+    // e.g. `in result\n[Query="QueryName"]` — the [Query=...] block changes on rename
+    // causing false content-mismatch in rename detection. Safe to strip: valid M does
+    // not append bare [key=value] blocks after the `in` expression.
+    return trimmed.replace(/(\s*\[[^\]]*\]\s*)+$/, '').trim();
 }
 
 function normalizeForCompare(s: string): string {
@@ -294,6 +298,8 @@ foreach ($Candidate in @($Excel.Workbooks)) {
     } catch {}
 }
 if ($null -eq $Workbook) { throw "El libro no esta abierto en Excel: $TargetPath" }
+
+$Workbook.Save()
 
 $Result = @()
 foreach ($Query in @($Workbook.Queries)) {
@@ -368,6 +374,20 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         if (ignore(path.basename(pqPath, '.pq'))) writtenFiles.add(path.resolve(pqPath));
     }
 
+    // Build content → path map for existing non-root .pq files.
+    // Used to recover group placement when a query was renamed in the PQ Editor:
+    // the mashup binary still maps the old name to its group, so the new name
+    // has no group entry and would otherwise land at root.
+    const contentToExistingGroupedPath = new Map<string, string>(); // '' = ambiguous match
+    for (const pqPath of collectPqFiles(outputRoot)) {
+        const rel = path.relative(outputRoot, pqPath);
+        if (!rel.includes(path.sep)) continue; // skip root-level files
+        try {
+            const content = normalizeForCompare(stripMetadata(fs.readFileSync(pqPath, 'utf8')));
+            contentToExistingGroupedPath.set(content, contentToExistingGroupedPath.has(content) ? '' : pqPath);
+        } catch {}
+    }
+
     let changedCount = 0;
     let unchangedCount = 0;
     let rootUngroupedCount = 0;
@@ -375,20 +395,44 @@ ConvertTo-Json -InputObject ([array]$Result) -Compress
         if (ignore(name)) continue;
         const groupId = queryToGroup[name];
         const groupRelPath = groupId ? getFullGroupPath(groupId, queryGroups) : '';
-        const isUngrouped = !groupRelPath;
-        const inScope = matchesGroupFilter(groupRelPath, groupFilter);
-        if (!inScope && !isUngrouped) continue;
-        if (isUngrouped) rootUngroupedCount++;
-        const outPath = isUngrouped
-            ? path.resolve(outputRoot, `${cleanName(name)}.pq`)
-            : resolveOutputPath(name, outputRoot, nameToPath, queryToGroup, queryGroups);
+        const normalized = normalizeForCompare(stripMetadata(formula));
+
+        let outPath: string;
+        if (groupRelPath) {
+            if (!matchesGroupFilter(groupRelPath, groupFilter)) continue;
+            outPath = resolveOutputPath(name, outputRoot, nameToPath, queryToGroup, queryGroups);
+        } else {
+            // No group metadata — three-step fallback:
+            // (1) same-name file already exists in a non-root subfolder (user placed it / prior pull)
+            // (2) content match for rename detection (query renamed in PQ Editor, formula unchanged)
+            // (3) mcode root (genuinely ungrouped or unresolvable)
+            const existingByName = nameToPath.get(cleanName(name));
+            const existingByNameRel = existingByName ? path.relative(outputRoot, existingByName) : null;
+            const existingByNameIsGrouped = existingByNameRel ? existingByNameRel.includes(path.sep) : false;
+
+            if (existingByNameIsGrouped) {
+                const groupRelOfExisting = path.relative(outputRoot, path.dirname(existingByName!));
+                if (!matchesGroupFilter(groupRelOfExisting, groupFilter)) continue;
+                outPath = existingByName!;
+            } else {
+                const existingMatch = contentToExistingGroupedPath.get(normalized);
+                if (existingMatch) {
+                    const recoveredGroupRelPath = path.relative(outputRoot, path.dirname(existingMatch));
+                    if (!matchesGroupFilter(recoveredGroupRelPath, groupFilter)) continue;
+                    outPath = path.resolve(path.dirname(existingMatch), `${cleanName(name)}.pq`);
+                } else {
+                    rootUngroupedCount++;
+                    outPath = path.resolve(outputRoot, `${cleanName(name)}.pq`);
+                }
+            }
+        }
+
         const dir = path.dirname(outPath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        const normalized = normalizeForCompare(stripMetadata(formula));
         const resolvedPath = path.resolve(outPath);
         writtenFiles.add(resolvedPath);
         const existingContent = fs.existsSync(outPath)
-            ? normalizeForCompare(fs.readFileSync(outPath, 'utf8'))
+            ? normalizeForCompare(stripMetadata(fs.readFileSync(outPath, 'utf8')))
             : null;
         if (existingContent === normalized) { unchangedCount++; continue; }
         fs.writeFileSync(outPath, normalized, 'utf8');
@@ -549,7 +593,7 @@ function extractMCode(xlsxPath: string, outputRoot: string, groupFilter: string 
             writtenFiles.add(outPath);
 
             const existingContent = fs.existsSync(outPath)
-                ? normalizeForCompare(fs.readFileSync(outPath, 'utf8'))
+                ? normalizeForCompare(stripMetadata(fs.readFileSync(outPath, 'utf8')))
                 : null;
             if (existingContent === normalized) { unchangedCount++; continue; }
             fs.writeFileSync(outPath, normalized, 'utf8');
